@@ -1,0 +1,22 @@
+services:
+  # Backend Spring Boot Service
+  - type: web
+    name: hotel-booking-backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_NAME
+        value: "neondb"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"

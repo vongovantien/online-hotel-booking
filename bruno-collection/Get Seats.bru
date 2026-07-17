@@ -1,0 +1,16 @@
+meta {
+  name: Get Seats
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/showtimes/{{showtimeId}}/seats
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:8080
+  showtimeId: 33333333-3333-3333-3333-333333333333
+}

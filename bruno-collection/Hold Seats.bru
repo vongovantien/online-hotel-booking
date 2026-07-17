@@ -1,0 +1,26 @@
+meta {
+  name: Hold Seats
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/showtimes/{{showtimeId}}/hold
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "userId": "11111111-1111-1111-1111-111111111111",
+    "seatIds": [
+      "PASTE_SEAT_UUID_HERE"
+    ]
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body && res.body.id) {
+    bru.setVar("bookingId", res.body.id);
+  }
+}

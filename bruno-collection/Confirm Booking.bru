@@ -1,0 +1,11 @@
+meta {
+  name: Confirm Booking
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/bookings/{{bookingId}}/confirm
+  body: none
+  auth: none
+}
