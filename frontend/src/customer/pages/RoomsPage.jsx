@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRooms } from '../services/api';
+import api, { getRooms, getAvailableRooms } from '../services/api';
 import BookingModal from '../components/BookingModal';
 import PageBanner from '../components/PageBanner';
 import { useLanguage } from '../../context/LanguageContext';
@@ -19,6 +19,10 @@ export default function RoomsPage() {
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState('');
   
+  // Date filters
+  const [checkIn, setCheckIn]             = useState('');
+  const [checkOut, setCheckOut]           = useState('');
+  
   // Filters & Search & Sort states
   const [searchKeyword, setSearchKeyword] = useState('');
   const [typeFilter, setTypeFilter]       = useState('');
@@ -31,20 +35,38 @@ export default function RoomsPage() {
 
   const [selectedRoom, setSelectedRoom] = useState(null);
 
+  // Reviews states (Phase 3)
+  const [reviewsMap, setReviewsMap] = useState({});
+  const [viewingReviewsType, setViewingReviewsType] = useState(null);
+
   const fetchRooms = () => {
     setLoading(true);
-    // Fetch all rooms from backend (or filtered by server if type/status provided)
-    // We fetch all to allow instantaneous rich search, sort, and pagination across all rooms
-    getRooms()
-      .then(data => {
+    const apiCall = (checkIn && checkOut)
+      ? getAvailableRooms(checkIn, checkOut)
+      : getRooms();
+    apiCall
+      .then(async data => {
         setRooms(data);
         setError('');
+        
+        const reviewsData = {};
+        for (const room of data) {
+          if (room.roomTypeId && !reviewsData[room.roomTypeId]) {
+            try {
+              const revRes = await api.get(`/reviews/room-type/${room.roomTypeId}`);
+              reviewsData[room.roomTypeId] = revRes.data || [];
+            } catch {
+              reviewsData[room.roomTypeId] = [];
+            }
+          }
+        }
+        setReviewsMap(reviewsData);
       })
       .catch(() => setError(t('rooms.notFound')))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchRooms(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchRooms(); }, [checkIn, checkOut]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset to page 1 whenever any filter or search changes
   useEffect(() => {
@@ -118,7 +140,59 @@ export default function RoomsPage() {
             marginBottom: 24,
           }}>
             <div className="row" style={{ alignItems: 'center', rowGap: 16 }}>
-              
+              {/* Date Filters Row */}
+              <div className="col-12" style={{ borderBottom: '1px solid #eee', paddingBottom: '16px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: '#444' }}>{t('rooms.checkinLabel')}</span>
+                    <input
+                      type="date"
+                      value={checkIn}
+                      onChange={e => setCheckIn(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 20,
+                        border: '1.5px solid #e0e0e0',
+                        fontSize: 14,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: '#444' }}>{t('rooms.checkoutLabel')}</span>
+                    <input
+                      type="date"
+                      value={checkOut}
+                      onChange={e => setCheckOut(e.target.value)}
+                      min={checkIn || new Date().toISOString().split('T')[0]}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 20,
+                        border: '1.5px solid #e0e0e0',
+                        fontSize: 14,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  {(checkIn || checkOut) && (
+                    <button
+                      onClick={() => { setCheckIn(''); setCheckOut(''); }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ff0909',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('rooms.clearDateFilters')}
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Search Box */}
               <div className="col-lg-6 col-md-12">
                 <div style={{ position: 'relative' }}>
@@ -321,6 +395,35 @@ export default function RoomsPage() {
                             {room.note || `Phòng ${room.roomTypeName === 'C' ? 'VIP' : room.roomTypeName === 'B' ? 'cao cấp' : 'tiêu chuẩn'} với đầy đủ tiện nghi hiện đại.`}
                           </p>
 
+                          {/* Rating & Review Summary (Phase 3) */}
+                          {(() => {
+                            const revs = reviewsMap[room.roomTypeId] || [];
+                            const avgRating = revs.length > 0
+                              ? (revs.reduce((acc, r) => acc + r.rating, 0) / revs.length).toFixed(1)
+                              : null;
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 13 }}>
+                                <span style={{ color: '#fbbf24', fontSize: 16 }}>★</span>
+                                <span style={{ fontWeight: 700, color: '#111' }}>
+                                  {avgRating ? `${avgRating}/5.0` : 'Chưa có đánh giá'}
+                                </span>
+                                <span style={{ color: '#888' }}>({revs.length})</span>
+                                {revs.length > 0 && (
+                                  <button
+                                    onClick={() => setViewingReviewsType({ id: room.roomTypeId, name: room.roomTypeName, reviews: revs })}
+                                    style={{
+                                      background: 'none', border: 'none', color: '#ff0909', fontWeight: 600,
+                                      padding: 0, textDecoration: 'underline', cursor: 'pointer', marginLeft: 'auto',
+                                      fontSize: 12
+                                    }}
+                                  >
+                                    Xem đánh giá
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
+
                           {room.status === 'AVAILABLE' ? (
                             <button
                               className="book_btn"
@@ -418,6 +521,45 @@ export default function RoomsPage() {
           room={selectedRoom}
           onClose={() => { setSelectedRoom(null); fetchRooms(); }}
         />
+      )}
+
+      {viewingReviewsType && (
+        <div className="booking-overlay" onClick={() => setViewingReviewsType(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1000, padding: 16
+        }}>
+          <div className="booking-modal" onClick={e => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500,
+            overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.15)'
+          }}>
+            <div className="booking-modal-header" style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 20px', borderBottom: '1px solid #eee'
+            }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 750 }}>Đánh giá Loại phòng {viewingReviewsType.name}</h3>
+              <button className="booking-close" onClick={() => setViewingReviewsType(null)} style={{
+                background: 'none', border: 'none', fontSize: 20, cursor: 'pointer'
+              }}>✕</button>
+            </div>
+            <div className="booking-modal-body" style={{ maxHeight: 350, overflowY: 'auto', padding: 20 }}>
+              {viewingReviewsType.reviews.map((r, idx) => (
+                <div key={idx} style={{ borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12, textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#111' }}>@{r.username}</span>
+                    <span style={{ color: '#fbbf24', fontSize: 12 }}>
+                      {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                    </span>
+                  </div>
+                  <p style={{ margin: '0 0 6px 0', fontSize: 13, color: '#555' }}>{r.comment}</p>
+                  <small style={{ color: '#aaa', fontSize: 11 }}>
+                    {new Date(r.createdAt).toLocaleDateString('vi-VN')}
+                  </small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

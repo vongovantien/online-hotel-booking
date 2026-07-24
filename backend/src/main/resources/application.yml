@@ -10,6 +10,12 @@ spring:
   threads:
     virtual:
       enabled: true   # enables virtual threads for @Async and Spring task executor
+  redis:
+    host: ${REDIS_HOST:10.77.0.11}
+    port: ${REDIS_PORT:31006}
+    password: ${REDIS_PASSWORD:Rg7keCbAMt}
+  redisson:
+    config: "classpath:redisson.yaml"
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:10.77.0.11}:${DB_PORT:31221}/${DB_NAME:tienvo}?sslmode=prefer&sslfactory=org.postgresql.ssl.NonValidatingFactory&prepareThreshold=0
@@ -40,3 +46,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operationsSorter: method
+
+# VNPay Sandbox Configuration (Phase 3)
+vnpay:
+  tmn-code: "3PA6M70D"
+  hash-secret: "5OAXW334OHH994Y67D65A2C872Q0BOKX"
+  pay-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+  return-url: "http://localhost:8080/api/v1/payments/vnpay-callback"

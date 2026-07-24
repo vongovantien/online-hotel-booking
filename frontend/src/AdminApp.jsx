@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import api from './lib/axios';
 import stompClient from './lib/stompClient';
+import { getCookie, deleteCookie } from './lib/cookie';
 
 // Layout components
 import Sidebar  from './components/Sidebar';
 import StatsBar from './components/StatsBar';
 
 // Feature modules (barrel imports)
-import { LoginForm, RegisterForm } from './features/auth';
-import { RoomSearch }              from './features/rooms';
+import { LoginForm, RegisterForm, UserManagement } from './features/auth';
+import { RoomSearch, RoomTimelineScheduler, Dashboard } from './features/rooms';
 import { CheckIn }                 from './features/checkin';
 import { Checkout }                from './features/checkout';
 import { MonthlyReports }          from './features/reports';
 import { Settings }                from './features/settings';
 import { AdminChatView }           from './features/chat';
+import { ServiceManage }           from './features/services';
 
 function AccessDenied({ tab }) {
   return (
@@ -27,7 +29,7 @@ function AccessDenied({ tab }) {
 
 export default function AdminApp() {
   const [token, setToken] = useState(
-    () => localStorage.getItem('auth_token') || null
+    () => getCookie('auth_token') || null
   );
   const [user, setUser] = useState(() => {
     try {
@@ -38,7 +40,7 @@ export default function AdminApp() {
   });
 
   const [authView, setAuthView]   = useState('login');
-  const [activeTab, setActiveTab] = useState('rooms');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [roomsStats, setRoomsStats] = useState({ total: 15, available: 15, rented: 0 });
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
@@ -97,7 +99,7 @@ export default function AdminApp() {
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
     finally {
-      localStorage.removeItem('auth_token');
+      deleteCookie('auth_token');
       localStorage.removeItem('auth_user');
       setToken(null);
       setUser(null);
@@ -107,8 +109,12 @@ export default function AdminApp() {
 
   const getVisibleTabs = () => {
     if (!user) return [];
-    const tabs = [{ key: 'rooms', label: '🏨 Tra Cứu Phòng', icon: '🔑', desc: 'BM3' }];
+    const tabs = [
+      { key: 'dashboard', label: '📊 Tổng Quan', icon: '📊', desc: 'Dashboard' },
+      { key: 'rooms', label: '🏨 Tra Cứu Phòng', icon: '🔑', desc: 'BM3' },
+    ];
     if (user.role === 'RECEPTIONIST' || user.role === 'ADMIN') {
+      tabs.push({ key: 'scheduler', label: '📅 Lịch Đặt Phòng', icon: '📅',  desc: 'Phase 1' });
       tabs.push({ key: 'checkin',  label: '📝 Lập Phiếu Thuê', icon: '🖊️',  desc: 'BM2' });
       tabs.push({ key: 'checkout', label: '💳 Thanh Toán',      icon: '💰',  desc: 'BM4' });
       tabs.push({
@@ -119,6 +125,8 @@ export default function AdminApp() {
       });
     }
     if (user.role === 'ADMIN') {
+      tabs.push({ key: 'services', label: '🍹 Quản Lý Dịch Vụ', icon: '🍹', desc: 'Phase 2' });
+      tabs.push({ key: 'users',    label: '👥 Quản Lý Người Dùng', icon: '👥', desc: 'RBAC' });
       tabs.push({ key: 'reports',  label: '📊 Báo Cáo Tháng',   icon: '📈',  desc: 'BM5' });
       tabs.push({ key: 'settings', label: '⚙️ Cấu Hình Quy Định', icon: '🛠️', desc: 'QĐ6' });
     }
@@ -175,16 +183,24 @@ export default function AdminApp() {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto h-screen">
         <StatsBar activeTab={activeTab} stats={roomsStats} />
         <main className="flex-grow p-8">
+          {activeTab === 'dashboard' && <Dashboard />}
           {activeTab === 'rooms'    && <RoomSearch />}
+          {activeTab === 'scheduler' && <RoomTimelineScheduler />}
           {activeTab === 'checkin'  && <CheckIn />}
           {activeTab === 'checkout' && <Checkout />}
           {activeTab === 'chat'     && <AdminChatView user={user} />}
+          {activeTab === 'services' && (user?.role === 'ADMIN'
+            ? <ServiceManage />
+            : <AccessDenied tab="services" />)}
           {activeTab === 'reports'  && (user?.role === 'ADMIN'
             ? <MonthlyReports />
             : <AccessDenied tab="reports" />)}
           {activeTab === 'settings' && (user?.role === 'ADMIN'
             ? <Settings />
             : <AccessDenied tab="settings" />)}
+          {activeTab === 'users' && (user?.role === 'ADMIN'
+            ? <UserManagement />
+            : <AccessDenied tab="users" />)}
         </main>
       </div>
     </div>

@@ -45,10 +45,16 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public auth paths
+                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register").permitAll()
+                .requestMatchers("/api/v1/auth/profile", "/api/v1/auth/change-password", "/api/v1/auth/logout").authenticated()
+                // Admin user management
+                .requestMatchers("/api/v1/auth/users/**").hasRole(UserRole.ADMIN.name())
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 // Swagger and documentation paths
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**").permitAll()
                 // Rooms search & view is public
+                .requestMatchers(HttpMethod.GET, "/api/v1/rooms/*/active-rental").hasAnyRole(
+                        UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
                 .requestMatchers(HttpMethod.GET, "/api/v1/rooms/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasAnyRole(
                         UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
@@ -66,6 +72,24 @@ public class SecurityConfig {
                         UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
                 .requestMatchers("/api/v1/invoices/checkout").hasAnyRole(
                         UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                // Bookings
+                .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasAnyRole(
+                        UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                .requestMatchers("/api/v1/bookings/my").hasAnyRole(
+                        UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                .requestMatchers(HttpMethod.PUT, "/api/v1/bookings/*/cancel").hasAnyRole(
+                        UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                .requestMatchers("/api/v1/bookings/**").hasAnyRole(
+                        UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                // Services
+                .requestMatchers(HttpMethod.GET, "/api/v1/services").permitAll()
+                .requestMatchers("/api/v1/services/**").hasRole(UserRole.ADMIN.name())
+                .requestMatchers("/api/v1/rentals/*/services").hasAnyRole(
+                        UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                // Reviews
+                .requestMatchers(HttpMethod.GET, "/api/v1/reviews/room-type/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/reviews").hasAnyRole(
+                        UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
                 // Quản lý Chat của Lễ tân & Admin
                 .requestMatchers("/api/v1/chat/rooms").hasAnyRole(
                         UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())

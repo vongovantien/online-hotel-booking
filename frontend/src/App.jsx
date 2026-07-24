@@ -14,6 +14,7 @@ import RegisterPage        from './customer/pages/RegisterPage';
 import ProtectedRoute      from './customer/components/ProtectedRoute';
 import MyBookingsPage      from './customer/pages/MyBookingsPage';
 import ProfilePage         from './customer/pages/ProfilePage';
+import PaymentSuccessPage  from './customer/pages/PaymentSuccessPage';
 
 // ─── Admin dashboard
 import AdminApp from './AdminApp';
@@ -43,6 +44,7 @@ export default function App() {
                     <Route element={<ProtectedRoute />}>
                       <Route path="my-bookings" element={<MyBookingsPage />} />
                       <Route path="profile"     element={<ProfilePage />} />
+                      <Route path="payment-success" element={<PaymentSuccessPage />} />
                     </Route>
                     <Route path="*"       element={<Navigate to="/" replace />} />
                   </Route>

@@ -99,6 +99,16 @@ public class HotelController {
         return ResponseEntity.ok(mapToRentalSlipResponse(rental));
     }
 
+    @GetMapping("/rooms/{roomId}/active-rental")
+    @Operation(summary = "Lấy phiếu thuê phòng hoạt động của phòng")
+    public ResponseEntity<RentalSlipResponse> getActiveRentalByRoom(@PathVariable UUID roomId) {
+        RentalSlipEntity rental = rentalService.findActiveRentalByRoomId(roomId);
+        if (rental == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(mapToRentalSlipResponse(rental));
+    }
+
     // =========================================================================
     // BM4 & QĐ4: Lập hóa đơn thanh toán (Lễ tân, Quản trị viên)
     // =========================================================================
@@ -227,6 +237,7 @@ public class HotelController {
                         d.getBasePriceSnapshot(),
                         d.getSurchargeRatioApplied(),
                         d.getCoefficientApplied(),
+                        d.getServiceCharge(),
                         d.getSubTotal()
                 )).toList();
 
@@ -236,6 +247,7 @@ public class HotelController {
                 invoice.getAddress(),
                 invoice.getTotalAmount(),
                 invoice.getPaymentDate(),
+                invoice.getPaymentMethod(),
                 detailResponses
         );
     }

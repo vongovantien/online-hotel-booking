@@ -79,8 +79,9 @@ public class RentalService {
         return rentalSlipRepository.findByStatus(RentalSlipStatusEntity.ACTIVE);
     }
 
-    public RentalSlipEntity findById(java.util.UUID id) {
-        return rentalSlipRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiếu thuê: " + id));
+    public RentalSlipEntity findActiveRentalByRoomId(java.util.UUID roomId) {
+        return rentalSlipRepository.findByRoom_IdAndStatus(roomId, RentalSlipStatusEntity.ACTIVE)
+                .stream().findFirst()
+                .orElse(null);
     }
 }

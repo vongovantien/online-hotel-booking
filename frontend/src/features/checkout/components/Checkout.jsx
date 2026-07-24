@@ -6,6 +6,7 @@ export default function Checkout() {
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [customerName, setCustomerName] = useState('');
   const [address, setAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [invoice, setInvoice] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,7 @@ export default function Checkout() {
       const res = await api.post('/invoices/checkout', {
         customerOrgName: customerName,
         address,
+        paymentMethod,
         roomIds: selectedRooms,
       });
       setInvoice(res.data);
@@ -64,7 +66,7 @@ export default function Checkout() {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-slate-400">Khách hàng / Cơ quan:</span>{' '}
               <span className="text-white font-bold block mt-0.5">
@@ -75,6 +77,15 @@ export default function Checkout() {
               <span className="text-slate-400">Địa chỉ:</span>{' '}
               <span className="text-white font-medium block mt-0.5">
                 {invoice.address || '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400">Hình thức thanh toán:</span>{' '}
+              <span className="text-amber-400 font-bold block mt-0.5">
+                {invoice.paymentMethod === 'CASH' && '💵 Tiền mặt'}
+                {invoice.paymentMethod === 'BANK_TRANSFER' && '🏦 Chuyển khoản'}
+                {invoice.paymentMethod === 'CREDIT_CARD' && '💳 Thẻ tín dụng'}
+                {invoice.paymentMethod === 'VNPAY' && '📲 Ví VNPay'}
               </span>
             </div>
           </div>
@@ -90,6 +101,7 @@ export default function Checkout() {
                     <th className="px-4 py-3 text-right">Đơn giá</th>
                     <th className="px-4 py-3 text-right">Phụ thu</th>
                     <th className="px-4 py-3 text-right">HS Nước ngoài</th>
+                    <th className="px-4 py-3 text-right">Tiền dịch vụ</th>
                     <th className="px-4 py-3 text-right">Thành tiền</th>
                   </tr>
                 </thead>
@@ -114,6 +126,9 @@ export default function Checkout() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         x{d.coefficientApplied}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-300">
+                        {Number(d.serviceCharge || 0).toLocaleString('vi-VN')} đ
                       </td>
                       <td className="px-4 py-3 text-right text-amber-400 font-bold">
                         {Number(d.subTotal).toLocaleString('vi-VN')} đ
@@ -142,7 +157,7 @@ export default function Checkout() {
       )}
 
       <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 p-6 space-y-6 shadow-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
               Tên Khách hàng / Cơ quan thanh toán *
@@ -164,6 +179,21 @@ export default function Checkout() {
               placeholder="190 Pasteur, Quận 3, HCM"
               className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-amber-500"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Hình thức thanh toán
+            </label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-amber-500"
+            >
+              <option value="CASH">💵 Tiền mặt (Cash)</option>
+              <option value="BANK_TRANSFER">🏦 Chuyển khoản ngân hàng (VietQR)</option>
+              <option value="CREDIT_CARD">💳 Thẻ tín dụng (Credit Card)</option>
+              <option value="VNPAY">📲 Ví điện tử VNPay QR</option>
+            </select>
           </div>
         </div>
 
@@ -197,6 +227,39 @@ export default function Checkout() {
             </div>
           )}
         </div>
+
+        {selectedRooms.length > 0 && (paymentMethod === 'BANK_TRANSFER' || paymentMethod === 'VNPAY') && (
+          <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 justify-center shadow-xl animate-fade-in">
+            <div className="bg-white p-3 rounded-xl shadow-lg border border-slate-200">
+              <img
+                src={
+                  paymentMethod === 'BANK_TRANSFER'
+                    ? `https://img.vietqr.io/image/vietinbank-113366668888-compact2.png?amount=${selectedRooms.reduce((acc, roomId) => acc + (rooms.find(r => r.id === roomId)?.price || rooms.find(r => r.id === roomId)?.basePrice || 0), 0)}&addInfo=Thanh%20toan%20phong%20${selectedRooms.map(id => rooms.find(r => r.id === id)?.roomNumber).join('%20')}&accountName=KHACH%20SAN%20ONLINE`
+                    : `https://img.vietqr.io/image/vnpay-qr-compact.png?amount=${selectedRooms.reduce((acc, roomId) => acc + (rooms.find(r => r.id === roomId)?.price || rooms.find(r => r.id === roomId)?.basePrice || 0), 0)}&addInfo=VNPAY%20phong%20${selectedRooms.map(id => rooms.find(r => r.id === id)?.roomNumber).join('%20')}`
+                }
+                alt="Payment QR Code"
+                className="w-48 h-48 object-contain"
+                onError={(e) => {
+                  // Fallback if network fails
+                  e.target.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=MockPayment';
+                }}
+              />
+            </div>
+            <div className="space-y-3 text-center md:text-left">
+              <h4 className="text-amber-400 font-bold text-lg">
+                {paymentMethod === 'BANK_TRANSFER' ? '🏦 QUÉT MÃ CHUYỂN KHOẢN VIETQR' : '📲 QUÉT MÃ VNPAY QR'}
+              </h4>
+              <p className="text-sm text-slate-300 leading-relaxed max-w-md">
+                Hệ thống đã tự động tính toán tổng số tiền tạm tính dựa trên số phòng được chọn. 
+                Vui lòng yêu cầu khách hàng quét mã bên cạnh để thanh toán qua ứng dụng ngân hàng hoặc ví điện tử.
+              </p>
+              <div className="text-sm space-y-1 text-slate-400">
+                <div>Số tiền tạm tính: <span className="text-white font-bold">{selectedRooms.reduce((acc, roomId) => acc + (rooms.find(r => r.id === roomId)?.price || rooms.find(r => r.id === roomId)?.basePrice || 0), 0).toLocaleString('vi-VN')} đ</span></div>
+                <div>Nội dung: <span className="text-white font-mono">Thanh toan phong {selectedRooms.map(id => rooms.find(r => r.id === id)?.roomNumber).join(', ')}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={handleCheckout}

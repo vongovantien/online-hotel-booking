@@ -124,4 +124,56 @@ public class AuthService {
             // Handle parsing exceptions gracefully (e.g. malformed or expired tokens)
         }
     }
+
+    public UserEntity getUserProfile(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng: " + username));
+    }
+
+    @Transactional
+    public UserEntity updateEmail(String username, String newEmail) {
+        UserEntity user = getUserProfile(username);
+        if (!user.getEmail().equalsIgnoreCase(newEmail) && userRepository.existsByEmail(newEmail)) {
+            throw new DuplicateResourceException("Email đã tồn tại.");
+        }
+        user.setEmail(newEmail);
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        UserEntity user = getUserProfile(username);
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            throw new BadCredentialsException("Mật khẩu cũ không chính xác.");
+        }
+        if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
+            throw new IllegalArgumentException(
+                "Mật khẩu mới phải chứa ít nhất 8 ký tự, bao gồm ít nhất một chữ hoa, một chữ số và một ký tự đặc biệt."
+            );
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
+    // ─── Admin User Management ───────────────────────────────────────────────────
+
+    public java.util.List<UserEntity> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    @Transactional
+    public UserEntity updateUserRole(UUID userId, String newRole) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng: " + userId));
+        user.setRole(newRole.toUpperCase());
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(UUID userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new IllegalArgumentException("Không tìm thấy người dùng: " + userId);
+        }
+        userRepository.deleteById(userId);
+    }
 }

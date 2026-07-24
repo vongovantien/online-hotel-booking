@@ -11,6 +11,7 @@ public record InvoiceResponse(
     String address,
     BigDecimal totalAmount,
     LocalDateTime paymentDate,
+    String paymentMethod,
     List<InvoiceDetailResponse> details
 ) {
     public record InvoiceDetailResponse(
@@ -22,6 +23,7 @@ public record InvoiceResponse(
         BigDecimal basePriceSnapshot,
         BigDecimal surchargeRatioApplied,
         BigDecimal coefficientApplied,
+        BigDecimal serviceCharge,
         BigDecimal subTotal
     ) {}
 }

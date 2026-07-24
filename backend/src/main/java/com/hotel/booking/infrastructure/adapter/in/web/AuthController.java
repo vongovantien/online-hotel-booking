@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @CrossOrigin(origins = "*")
@@ -43,6 +45,55 @@ public class AuthController {
     @Operation(summary = "Đăng xuất — blacklist token trong Redis")
     public ResponseEntity<Void> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         authService.logout(authHeader);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/profile")
+    @Operation(summary = "Lấy hồ sơ người dùng hiện tại")
+    public ResponseEntity<UserEntity> getProfile(Principal principal) {
+        UserEntity user = authService.getUserProfile(principal.getName());
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "Cập nhật email hồ sơ người dùng")
+    public ResponseEntity<UserEntity> updateProfile(
+            @RequestParam String email,
+            Principal principal) {
+        UserEntity user = authService.updateEmail(principal.getName(), email);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/change-password")
+    @Operation(summary = "Đổi mật khẩu")
+    public ResponseEntity<Void> changePassword(
+            @RequestParam String oldPassword,
+            @RequestParam String newPassword,
+            Principal principal) {
+        authService.changePassword(principal.getName(), oldPassword, newPassword);
+        return ResponseEntity.ok().build();
+    }
+
+    // ─── Admin User Management ───────────────────────────────────────────────────
+
+    @GetMapping("/users")
+    @Operation(summary = "Danh sách tất cả người dùng (Admin)")
+    public ResponseEntity<java.util.List<UserEntity>> getAllUsers() {
+        return ResponseEntity.ok(authService.getAllUsers());
+    }
+
+    @PutMapping("/users/{id}/role")
+    @Operation(summary = "Cập nhật vai trò người dùng (Admin)")
+    public ResponseEntity<UserEntity> updateUserRole(
+            @PathVariable java.util.UUID id,
+            @RequestParam String role) {
+        return ResponseEntity.ok(authService.updateUserRole(id, role));
+    }
+
+    @DeleteMapping("/users/{id}")
+    @Operation(summary = "Xóa người dùng (Admin)")
+    public ResponseEntity<Void> deleteUser(@PathVariable java.util.UUID id) {
+        authService.deleteUser(id);
         return ResponseEntity.ok().build();
     }
 }

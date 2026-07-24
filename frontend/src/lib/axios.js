@@ -5,10 +5,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Inject Bearer token from localStorage on every request
+import { getCookie } from './cookie';
+
+// Inject Bearer token from cookies on every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('customer_token');
+    const token = getCookie('auth_token') || getCookie('customer_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

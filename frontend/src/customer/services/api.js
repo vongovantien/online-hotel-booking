@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../../lib/cookie';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
@@ -7,7 +8,7 @@ const api = axios.create({
 
 // Inject Bearer token on every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token') || localStorage.getItem('customer_token');
+  const token = getCookie('auth_token') || getCookie('customer_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -58,6 +59,25 @@ export const createRental = (roomId, startDate, customers) =>
 // ─── Rentals ─────────────────────────────────────────────────────────────────
 export const getMyRentals = () =>
   api.get('/rentals').then(r => r.data);
+
+// ─── Online Bookings (Phase 1) ───────────────────────────────────────────────
+export const getAvailableRooms = (checkIn, checkOut) =>
+  api.get('/rooms/available', { params: { checkIn, checkOut } }).then(r => r.data);
+
+export const createBooking = (roomId, checkInDate, checkOutDate, guests) =>
+  api.post('/bookings', { roomId, checkInDate, checkOutDate, guests }).then(r => r.data);
+
+export const getMyBookings = () =>
+  api.get('/bookings/my').then(r => r.data);
+
+export const getAllBookings = () =>
+  api.get('/bookings').then(r => r.data);
+
+export const updateBookingStatus = (id, status) =>
+  api.put(`/bookings/${id}/status`, null, { params: { status } }).then(r => r.data);
+
+export const cancelBooking = (id) =>
+  api.put(`/bookings/${id}/cancel`).then(r => r.data);
 
 // ─── Chat (stub — returns empty if backend chat not yet implemented) ─────────
 

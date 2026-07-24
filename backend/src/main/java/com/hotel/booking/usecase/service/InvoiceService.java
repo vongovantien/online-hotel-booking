@@ -25,17 +25,26 @@ public class InvoiceService {
     private final SystemParameterRepository systemParameterRepository;
     private final InvoiceRepository invoiceRepository;
     private final RedissonClient redissonClient;
+    private final RentalSlipServiceRepository rentalSlipServiceRepository;
+    private final EmailService emailService;
+    private final BookingRepository bookingRepository;
 
     public InvoiceService(RentalSlipRepository rentalSlipRepository,
                           RoomRepository roomRepository,
                           SystemParameterRepository systemParameterRepository,
                           InvoiceRepository invoiceRepository,
-                          RedissonClient redissonClient) {
+                          RedissonClient redissonClient,
+                          RentalSlipServiceRepository rentalSlipServiceRepository,
+                          EmailService emailService,
+                          BookingRepository bookingRepository) {
         this.rentalSlipRepository = rentalSlipRepository;
         this.roomRepository = roomRepository;
         this.systemParameterRepository = systemParameterRepository;
         this.invoiceRepository = invoiceRepository;
         this.redissonClient = redissonClient;
+        this.rentalSlipServiceRepository = rentalSlipServiceRepository;
+        this.emailService = emailService;
+        this.bookingRepository = bookingRepository;
     }
 
     /**
@@ -54,6 +63,7 @@ public class InvoiceService {
         InvoiceEntity invoice = InvoiceEntity.builder()
                 .customerOrgName(request.customerOrgName())
                 .address(request.address())
+                .paymentMethod(request.paymentMethod())
                 .totalAmount(BigDecimal.ZERO)
                 .paymentDate(LocalDateTime.now())
                 .details(new ArrayList<>())
@@ -93,11 +103,18 @@ public class InvoiceService {
                 BigDecimal actualSurchargeRatio = guestCount >= 3 ? surchargeRate : BigDecimal.ZERO;
                 BigDecimal actualCoefficient = hasForeign ? foreignCoefficient : BigDecimal.ONE;
 
-                BigDecimal subTotal = BigDecimal.valueOf(days)
+                // Load services used
+                List<RentalSlipServiceEntity> servicesUsed = rentalSlipServiceRepository.findByRentalSlip_Id(rental.getId());
+                BigDecimal serviceCharge = servicesUsed.stream()
+                        .map(s -> s.getPriceSnapshot().multiply(BigDecimal.valueOf(s.getQuantity())))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal roomCost = BigDecimal.valueOf(days)
                         .multiply(basePrice)
                         .multiply(BigDecimal.ONE.add(actualSurchargeRatio))
-                        .multiply(actualCoefficient)
-                        .setScale(2, RoundingMode.HALF_UP);
+                        .multiply(actualCoefficient);
+
+                BigDecimal subTotal = roomCost.add(serviceCharge).setScale(2, RoundingMode.HALF_UP);
 
                 InvoiceDetailEntity detail = InvoiceDetailEntity.builder()
                         .invoice(invoice)
@@ -107,6 +124,7 @@ public class InvoiceService {
                         .basePriceSnapshot(basePrice)
                         .surchargeRatioApplied(actualSurchargeRatio)
                         .coefficientApplied(actualCoefficient)
+                        .serviceCharge(serviceCharge)
                         .subTotal(subTotal)
                         .build();
 
@@ -130,6 +148,62 @@ public class InvoiceService {
         }
 
         invoice.setTotalAmount(grandTotal);
-        return invoiceRepository.save(invoice);
+        InvoiceEntity savedInvoice = invoiceRepository.save(invoice);
+
+        // Find customer email to send invoice (from booking if exists)
+        try {
+            for (UUID roomId : request.roomIds()) {
+                List<BookingEntity> roomBookings = bookingRepository.findOverlappingBookings(
+                        roomId, LocalDateTime.now().minusDays(30), LocalDateTime.now().plusDays(30));
+                
+                BookingEntity booking = roomBookings.stream()
+                        .filter(b -> b.getStatus() == BookingStatusEntity.CHECKED_IN || b.getStatus() == BookingStatusEntity.CONFIRMED)
+                        .findFirst()
+                        .orElse(null);
+                
+                if (booking != null) {
+                    booking.setStatus(BookingStatusEntity.CANCELLED); // Or mark completed
+                    bookingRepository.save(booking);
+
+                    String customerEmail = booking.getUser().getEmail();
+                    String subject = "Hóa đơn thanh toán phòng - Hotelify";
+                    StringBuilder servicesList = new StringBuilder();
+                    for (InvoiceDetailEntity det : savedInvoice.getDetails()) {
+                        servicesList.append(String.format("- Phòng P.%s (%s): %d ngày, Phụ thu: %,.0f%%, Hệ số: %s, Tiền dịch vụ: %,.0f đ, Thành tiền: %,.0f đ\n",
+                                det.getRoom().getRoomNumber(),
+                                det.getRoomTypeName(),
+                                det.getTotalDays(),
+                                det.getSurchargeRatioApplied().multiply(BigDecimal.valueOf(100)),
+                                det.getCoefficientApplied(),
+                                det.getServiceCharge(),
+                                det.getSubTotal()
+                        ));
+                    }
+                    String body = String.format(
+                            "Xin chào %s,\n\n" +
+                            "Hóa đơn thanh toán của bạn tại Hotelify đã được hoàn tất.\n\n" +
+                            "Chi tiết hóa đơn:\n" +
+                            "- Tên đơn vị: %s\n" +
+                            "- Địa chỉ: %s\n" +
+                            "- Phương thức thanh toán: %s\n" +
+                            "- Chi tiết các phòng:\n%s" +
+                            "- Tổng tiền thanh toán: %,.0f đ\n\n" +
+                            "Cảm ơn quý khách đã tin tưởng lựa chọn và sử dụng dịch vụ của Hotelify!\n",
+                            booking.getUser().getUsername(),
+                            savedInvoice.getCustomerOrgName() != null && !savedInvoice.getCustomerOrgName().isEmpty() ? savedInvoice.getCustomerOrgName() : "Khách cá nhân",
+                            savedInvoice.getAddress() != null && !savedInvoice.getAddress().isEmpty() ? savedInvoice.getAddress() : "N/A",
+                            savedInvoice.getPaymentMethod(),
+                            servicesList.toString(),
+                            savedInvoice.getTotalAmount()
+                    );
+                    emailService.sendEmail(customerEmail, subject, body);
+                    break; 
+                }
+            }
+        } catch (Exception e) {
+            // Ignore email errors to prevent rollback
+        }
+
+        return savedInvoice;
     }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createRental } from '../services/api';
+import api, { createBooking } from '../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 
 const EMPTY_GUEST = { customerName: '', customerType: 'DOMESTIC', idCard: '', address: '' };
@@ -12,10 +12,12 @@ export default function BookingModal({ room, onClose }) {
   const { t } = useLanguage();
 
   const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [guests, setGuests] = useState([{ ...EMPTY_GUEST }]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
 
   // Close on Escape key
   useEffect(() => {
@@ -35,8 +37,8 @@ export default function BookingModal({ room, onClose }) {
   const hasForeign = guests.some(g => g.customerType === 'FOREIGN');
   const surcharge  = guests.length >= 3 ? 0.25 : 0;
   const coefficient = hasForeign ? 1.5 : 1;
-  const estimatedDays = startDate
-    ? Math.max(1, Math.ceil((new Date() - new Date(startDate)) / 86400000) || 1)
+  const estimatedDays = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000) || 1)
     : 1;
   const estimatedTotal = Math.round(basePrice * (1 + surcharge) * coefficient * estimatedDays);
 
@@ -53,12 +55,26 @@ export default function BookingModal({ room, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!startDate || !endDate) {
+      setError(t('booking.dateMissingError'));
+      return;
+    }
+    if (new Date(endDate) <= new Date(startDate)) {
+      setError(t('booking.dateRangeError'));
+      return;
+    }
     setLoading(true);
     try {
-      const isoDate = startDate
-        ? `${startDate}T14:00:00`
-        : new Date().toISOString().slice(0, 19);
-      await createRental(room.id, isoDate, guests);
+      const checkInISO = `${startDate}T14:00:00`;
+      const checkOutISO = `${endDate}T12:00:00`;
+      const booking = await createBooking(room.id, checkInISO, checkOutISO, guests);
+      if (paymentMethod === 'VNPAY') {
+        const payRes = await api.get('/payments/create-payment', { params: { bookingId: booking.id } });
+        if (payRes.data && payRes.data.paymentUrl) {
+          window.location.href = payRes.data.paymentUrl;
+          return;
+        }
+      }
       setSuccess(true);
     } catch (err) {
       const msg = err.response?.data?.message
@@ -118,19 +134,57 @@ export default function BookingModal({ room, onClose }) {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* Checkin Date */}
+            {/* Checkin & Checkout Dates */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                  {t('booking.checkinDate')}
+                </label>
+                <input
+                  className="online_book"
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{ paddingRight: 16, marginBottom: 0, width: '100%' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                  {t('booking.checkoutDate')}
+                </label>
+                <input
+                  className="online_book"
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  min={startDate || new Date().toISOString().split('T')[0]}
+                  style={{ paddingRight: 16, marginBottom: 0, width: '100%' }}
+                />
+              </div>
+            </div>
+
+            {/* Payment Method */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
-                {t('booking.checkinDate')}
+                Phương thức thanh toán / Payment Method
               </label>
-              <input
-                className="online_book"
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                style={{ paddingRight: 16, marginBottom: 0 }}
-              />
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #eee',
+                  fontSize: 14,
+                  outline: 'none',
+                  background: '#fff',
+                }}
+              >
+                <option value="CASH">💵 Tiền mặt khi nhận phòng (Cash on Arrival)</option>
+                <option value="VNPAY">📲 Thanh toán trực tuyến qua VNPay Sandbox</option>
+              </select>
             </div>
 
             {/* Guests */}
@@ -149,7 +203,7 @@ export default function BookingModal({ room, onClose }) {
               {guests.map((guest, i) => (
                 <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, padding: '14px 16px', marginBottom: 12, background: '#fafafa' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: '#ff0909' }}>Khách / Guest {i + 1}</span>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: '#ff0909' }}>{t('booking.guestsLabel')} {i + 1}</span>
                     {guests.length > 1 && (
                       <button type="button" onClick={() => removeGuest(i)} style={{ background: 'transparent', color: '#999', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
                         ×
@@ -211,15 +265,15 @@ export default function BookingModal({ room, onClose }) {
               border: '1px solid #ffe0e0', borderRadius: 8,
             }}>
               <div style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>
-                💰 Ước tính chi phí ({estimatedDays} ngày):
-                {guests.length >= 3 && <span style={{ color: '#ff0909', marginLeft: 6 }}>+25% phụ thu 3 khách</span>}
-                {hasForeign && <span style={{ color: '#ff0909', marginLeft: 6 }}>×1.5 khách nước ngoài</span>}
+                💰 {t('booking.priceEstimate')} ({estimatedDays} {t('rooms.of')}):
+                {guests.length >= 3 && <span style={{ color: '#ff0909', marginLeft: 6 }}>{t('booking.surcharge3rd')}</span>}
+                {hasForeign && <span style={{ color: '#ff0909', marginLeft: 6 }}>{t('booking.foreignSurcharge')}</span>}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#ff0909' }}>
                 {estimatedTotal.toLocaleString('vi-VN')} đ
               </div>
               <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-                * Số ngày thực tế tính khi check-out
+                {t('booking.priceEstimateNote')}
               </div>
             </div>
           </form>

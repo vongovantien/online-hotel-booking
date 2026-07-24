@@ -14,6 +14,9 @@ public record CheckoutRequest(
 
     String address,
 
+    @NotBlank(message = "Phương thức thanh toán không được để trống")
+    String paymentMethod,
+
     @NotEmpty(message = "Phải có ít nhất 1 phòng để thanh toán")
     List<UUID> roomIds
 ) {}

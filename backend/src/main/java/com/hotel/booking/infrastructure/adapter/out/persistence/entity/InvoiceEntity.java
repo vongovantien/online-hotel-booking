@@ -30,6 +30,9 @@ public class InvoiceEntity {
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;
 
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<InvoiceDetailEntity> details;
 }

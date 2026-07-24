@@ -1,4 +1,4 @@
-package com.movie.booking.infrastructure.config;
+package com.hotel.booking.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

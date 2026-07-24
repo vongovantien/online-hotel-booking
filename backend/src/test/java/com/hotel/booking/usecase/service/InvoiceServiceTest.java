@@ -41,6 +41,9 @@ class InvoiceServiceTest {
     @Mock private InvoiceRepository invoiceRepository;
     @Mock private RedissonClient redissonClient;
     @Mock private RLock lock;
+    @Mock private RentalSlipServiceRepository rentalSlipServiceRepository;
+    @Mock private EmailService emailService;
+    @Mock private BookingRepository bookingRepository;
 
     private InvoiceService invoiceService;
 
@@ -52,7 +55,8 @@ class InvoiceServiceTest {
     void setUp() {
         invoiceService = new InvoiceService(
                 rentalSlipRepository, roomRepository,
-                systemParameterRepository, invoiceRepository, redissonClient);
+                systemParameterRepository, invoiceRepository, redissonClient,
+                rentalSlipServiceRepository, emailService, bookingRepository);
     }
 
     // =========================================================================
@@ -130,7 +134,7 @@ class InvoiceServiceTest {
             when(rentalSlipRepository.findByRoom_IdAndStatus(ROOM_ID, RentalSlipStatusEntity.ACTIVE))
                     .thenReturn(List.of(slip));
 
-            CheckoutRequest req = new CheckoutRequest("Công ty ABC", "HCM", List.of(ROOM_ID));
+            CheckoutRequest req = new CheckoutRequest("Công ty ABC", "HCM", "CASH", List.of(ROOM_ID));
             InvoiceEntity result = invoiceService.processCheckout(req);
 
             // 3 ngày × 150,000 × (1 + 0) × 1.0 = 450,000
@@ -159,7 +163,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // 2 ngày × 150,000 × 1.0 × 1.0 = 300,000
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("300000.00"));
@@ -182,7 +186,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // 2 ngày × 150,000 × 1.25 × 1.0 = 375,000
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("375000.00"));
@@ -204,7 +208,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // 2 ngày × 150,000 × 1.0 × 1.5 = 450,000
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("450000.00"));
@@ -230,7 +234,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // 2 ngày × 150,000 × 1.25 × 1.5 = 562,500
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("562500.00"));
@@ -256,7 +260,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // 1 ngày tối thiểu × 150,000 = 150,000
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("150000.00"));
@@ -275,13 +279,12 @@ class InvoiceServiceTest {
         @DisplayName("Throws khi không tìm thấy phiếu thuê ACTIVE cho phòng")
         void checkout_noActiveRental_throwsIllegalArgument() throws Exception {
             mockSystemParams();
-            mockLock();
 
             when(rentalSlipRepository.findByRoom_IdAndStatus(ROOM_ID, RentalSlipStatusEntity.ACTIVE))
                     .thenReturn(List.of()); // không có phiếu
 
             assertThatThrownBy(() -> invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID))))
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID))))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining(ROOM_ID.toString());
         }
@@ -290,11 +293,21 @@ class InvoiceServiceTest {
         @DisplayName("Throws khi không thể acquire distributed lock (phòng đang được xử lý)")
         void checkout_cannotAcquireLock_throwsIllegalState() throws InterruptedException {
             mockSystemParams();
+
+            RoomEntity testRoom = RoomEntity.builder().id(ROOM_ID).roomNumber("101").build();
+            RentalSlipEntity activeRental = RentalSlipEntity.builder()
+                    .id(UUID.randomUUID())
+                    .room(testRoom)
+                    .status(RentalSlipStatusEntity.ACTIVE)
+                    .build();
+            when(rentalSlipRepository.findByRoom_IdAndStatus(ROOM_ID, RentalSlipStatusEntity.ACTIVE))
+                    .thenReturn(List.of(activeRental));
+
             when(redissonClient.getLock(anyString())).thenReturn(lock);
             when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(false); // lock không acquired
 
             assertThatThrownBy(() -> invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID))))
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("đang được xử lý");
         }
@@ -326,7 +339,7 @@ class InvoiceServiceTest {
                     .thenReturn(List.of(slip));
 
             InvoiceEntity result = invoiceService.processCheckout(
-                    new CheckoutRequest("Test", "HN", List.of(ROOM_ID)));
+                    new CheckoutRequest("Test", "HN", "CASH", List.of(ROOM_ID)));
 
             // Fallback: 2 × 150,000 × 1.25 × 1.5 = 562,500 (same as explicit params)
             assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("562500.00"));

@@ -1,7 +1,8 @@
 # Redisson configuration — single-server mode
 # Spring Boot auto-detects this file when redisson-spring-boot-starter is on classpath
 singleServerConfig:
-  address: "redis://${REDIS_HOST:localhost}:${REDIS_PORT:6379}"
+  address: "redis://${REDIS_HOST:10.77.0.11}:${REDIS_PORT:31006}"
+  password: "${REDIS_PASSWORD:Rg7keCbAMt}"
   connectionMinimumIdleSize: 2
   connectionPoolSize: 10
   idleConnectionTimeout: 10000

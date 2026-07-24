@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../../lib/axios';
+import { setCookie } from '../../../lib/cookie';
 
 export default function LoginForm({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -35,7 +36,7 @@ export default function LoginForm({ onLoginSuccess }) {
         password,
       });
       const data = res.data;
-      localStorage.setItem('auth_token', data.token);
+      setCookie('auth_token', data.token);
       localStorage.setItem(
         'auth_user',
         JSON.stringify({

@@ -123,6 +123,16 @@ const translations = {
     'admin.stats.total': 'Tổng số phòng',
     'admin.stats.available': 'Còn trống',
     'admin.stats.rented': 'Đang thuê',
+    'booking.checkoutDate': 'Ngày trả phòng',
+    'booking.surcharge3rd': '+25% phụ thu 3 khách',
+    'booking.foreignSurcharge': 'x1.5 khách nước ngoài',
+    'booking.priceEstimate': 'Ước tính chi phí',
+    'booking.priceEstimateNote': '* Số ngày thực tế tính khi check-out',
+    'booking.dateRangeError': 'Ngày trả phòng phải sau ngày nhận phòng.',
+    'booking.dateMissingError': 'Vui lòng chọn cả ngày nhận phòng và ngày trả phòng.',
+    'rooms.checkinLabel': '📅 Nhận phòng:',
+    'rooms.checkoutLabel': '📅 Trả phòng:',
+    'rooms.clearDateFilters': 'Xóa bộ lọc ngày',
   },
   en: {
     // Nav & Common
@@ -240,6 +250,16 @@ const translations = {
     'admin.stats.total': 'Total Rooms',
     'admin.stats.available': 'Available',
     'admin.stats.rented': 'Occupied',
+    'booking.checkoutDate': 'Check-out Date',
+    'booking.surcharge3rd': '+25% surcharge for 3 guests',
+    'booking.foreignSurcharge': 'x1.5 foreign coefficient',
+    'booking.priceEstimate': 'Estimated cost',
+    'booking.priceEstimateNote': '* Actual days computed at check-out',
+    'booking.dateRangeError': 'Check-out date must be after check-in date.',
+    'booking.dateMissingError': 'Please select both check-in and check-out dates.',
+    'rooms.checkinLabel': '📅 Check-in:',
+    'rooms.checkoutLabel': '📅 Check-out:',
+    'rooms.clearDateFilters': 'Clear date filters',
   }
 };
 

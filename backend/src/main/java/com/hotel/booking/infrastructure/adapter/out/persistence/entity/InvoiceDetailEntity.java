@@ -40,6 +40,9 @@ public class InvoiceDetailEntity {
     @Column(name = "coefficient_applied", nullable = false, precision = 5, scale = 2)
     private BigDecimal coefficientApplied;
 
+    @Column(name = "service_charge")
+    private BigDecimal serviceCharge;
+
     @Column(name = "sub_total", nullable = false)
     private BigDecimal subTotal;
 }

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import { login as apiLogin, logout as apiLogout, register as apiRegister } from '../services/api';
+import { setCookie, deleteCookie } from '../../lib/cookie';
 
 const AuthContext = createContext({
   user: null,
@@ -36,7 +37,7 @@ export function AuthProvider({ children }) {
   const loginFn = async (username, password) => {
     const raw  = await apiLogin(username, password);
     const data = normaliseUser(raw);
-    localStorage.setItem('customer_token', data.token);
+    setCookie('customer_token', data.token);
     localStorage.setItem('customer_user',  JSON.stringify(data));
     setUser(data);
     return data;
@@ -45,7 +46,7 @@ export function AuthProvider({ children }) {
   const registerFn = async (username, password, fullName, email) => {
     const raw  = await apiRegister(username, password, fullName, email);
     const data = normaliseUser({ ...raw, fullName });  // inject fullName since backend doesn't echo it
-    localStorage.setItem('customer_token', data.token);
+    setCookie('customer_token', data.token);
     localStorage.setItem('customer_user',  JSON.stringify(data));
     setUser(data);
     return data;
@@ -53,7 +54,7 @@ export function AuthProvider({ children }) {
 
   const logoutFn = async () => {
     await apiLogout();
-    localStorage.removeItem('customer_token');
+    deleteCookie('customer_token');
     localStorage.removeItem('customer_user');
     setUser(null);
   };
