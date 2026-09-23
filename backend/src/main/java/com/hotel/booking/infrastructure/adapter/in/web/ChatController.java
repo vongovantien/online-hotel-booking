@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -64,7 +66,25 @@ public class ChatController {
     public ResponseEntity<ChatMessageResponse> sendMessage(
             @PathVariable UUID roomId,
             @Valid @RequestBody SendMessageRequest request) {
-        ChatMessageResponse res = chatService.sendMessage(roomId, request.senderRole(), request.senderName(), request.content());
+
+        String senderRole = "CUSTOMER";
+        String senderName = request.senderName();
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            boolean isStaff = auth.getAuthorities().stream().anyMatch(a ->
+                    a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST")
+            );
+            if (isStaff) {
+                if ("ADMIN".equalsIgnoreCase(request.senderRole())) {
+                    senderRole = "ADMIN";
+                } else if ("RECEPTIONIST".equalsIgnoreCase(request.senderRole())) {
+                    senderRole = "RECEPTIONIST";
+                }
+            }
+        }
+
+        ChatMessageResponse res = chatService.sendMessage(roomId, senderRole, senderName, request.content());
         try {
             // Push tin nhắn mới ngay cho những ai đang xem phòng này
             messagingTemplate.convertAndSend("/topic/rooms/" + roomId, res);

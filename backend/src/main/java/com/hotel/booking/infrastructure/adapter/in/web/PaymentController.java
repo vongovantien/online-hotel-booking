@@ -8,7 +8,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -40,10 +43,34 @@ public class PaymentController {
         BookingEntity booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn đặt phòng: " + bookingId));
 
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        boolean isStaff = auth.getAuthorities().stream().anyMatch(a ->
+                a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_RECEPTIONIST")
+        );
+        String currentUsername = auth.getName();
+        if (!isStaff && (booking.getUser() == null || !booking.getUser().getUsername().equals(currentUsername))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String vnp_TxnRef = booking.getId().toString();
-        String vnp_IpAddr = "127.0.0.1";
+        
+        String vnp_IpAddr = request.getHeader("X-Forwarded-For");
+        if (vnp_IpAddr == null || vnp_IpAddr.isBlank() || "unknown".equalsIgnoreCase(vnp_IpAddr)) {
+            vnp_IpAddr = request.getRemoteAddr();
+        }
+        if (vnp_IpAddr != null && vnp_IpAddr.contains(",")) {
+            vnp_IpAddr = vnp_IpAddr.split(",")[0].trim();
+        }
+        if (vnp_IpAddr == null || vnp_IpAddr.isBlank()) {
+            vnp_IpAddr = "127.0.0.1";
+        }
+
         String vnp_TmnCode = vnPayConfig.getTmnCode();
 
         Map<String, String> vnp_Params = new HashMap<>();
@@ -79,7 +106,7 @@ public class PaymentController {
         while (itr.hasNext()) {
             String fieldName = itr.next();
             String fieldValue = vnp_Params.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
+            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
                 // Build hash data
                 hashData.append(fieldName);
                 hashData.append('=');
@@ -113,6 +140,7 @@ public class PaymentController {
             @RequestParam Map<String, String> params,
             HttpServletResponse response) throws IOException {
         
+        String frontendUrl = vnPayConfig.getFrontendUrl();
         String vnp_SecureHash = params.get("vnp_SecureHash");
         Map<String, String> fields = new HashMap<>(params);
         fields.remove("vnp_SecureHash");
@@ -130,13 +158,13 @@ public class PaymentController {
                     booking.setStatus(BookingStatusEntity.CONFIRMED);
                     bookingRepository.save(booking);
                 }
-                response.sendRedirect("http://localhost:3000/payment-success?status=success&bookingId=" + bookingId);
+                response.sendRedirect(frontendUrl + "/payment-success?status=success&bookingId=" + bookingId);
             } else {
                 // Failure
-                response.sendRedirect("http://localhost:3000/payment-success?status=fail&bookingId=" + bookingId);
+                response.sendRedirect(frontendUrl + "/payment-success?status=fail&bookingId=" + bookingId);
             }
         } else {
-            response.sendRedirect("http://localhost:3000/payment-success?status=invalid_signature");
+            response.sendRedirect(frontendUrl + "/payment-success?status=invalid_signature");
         }
     }
 }

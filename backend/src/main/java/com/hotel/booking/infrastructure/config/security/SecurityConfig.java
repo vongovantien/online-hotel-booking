@@ -81,6 +81,10 @@ public class SecurityConfig {
                         UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
                 .requestMatchers("/api/v1/bookings/**").hasAnyRole(
                         UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
+                // Payments (VNPay Callback is public IPN/Return, create payment requires authentication)
+                .requestMatchers("/api/v1/payments/vnpay-callback").permitAll()
+                .requestMatchers("/api/v1/payments/**").hasAnyRole(
+                        UserRole.CUSTOMER.name(), UserRole.RECEPTIONIST.name(), UserRole.ADMIN.name())
                 // Services
                 .requestMatchers(HttpMethod.GET, "/api/v1/services").permitAll()
                 .requestMatchers("/api/v1/services/**").hasRole(UserRole.ADMIN.name())

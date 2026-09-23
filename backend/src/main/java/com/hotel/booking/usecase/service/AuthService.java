@@ -39,7 +39,7 @@ public class AuthService {
     }
 
     /**
-     * Workflow A: User Registration
+     * Workflow A: User Registration (Forces CUSTOMER role to prevent privilege escalation)
      */
     @Transactional
     public UserEntity register(RegisterRequest request) {
@@ -63,11 +63,12 @@ public class AuthService {
         // 4. BCrypt Hashing
         String hashedPassword = passwordEncoder.encode(request.password());
 
+        // Always force role CUSTOMER for public self-registration
         UserEntity user = UserEntity.builder()
                 .username(request.username())
                 .email(request.email())
                 .passwordHash(hashedPassword)
-                .role(request.role().toUpperCase())
+                .role("CUSTOMER")
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -155,7 +156,7 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    // ─── Admin User Management ───────────────────────────────────────────────────
+    // ─── Admin User Management ───────────────────────────────────────────────
 
     public java.util.List<UserEntity> getAllUsers() {
         return userRepository.findAll();

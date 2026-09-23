@@ -12,14 +12,15 @@ Hệ thống quản lý và đặt phòng khách sạn trực tuyến, được 
 
 - **Khách hàng:**
   - Tra cứu, tìm kiếm và lọc phòng theo trạng thái, loại phòng và giá cả.
-  - Đặt phòng trực tuyến.
+  - Đặt phòng trực tuyến (có khóa phân tán chống xung đột phòng).
+  - Thanh toán trực tuyến tích hợp VNPay Sandbox.
   - Chat trực tiếp (real-time) với nhân viên lễ tân để được hỗ trợ.
 
 - **Nhân viên / Lễ tân & Quản trị (Admin):**
   - Quản lý danh sách phòng (Thêm, Sửa, Xóa).
   - Lập phiếu thuê phòng và kiểm soát số lượng khách tối đa.
   - Xuất hóa đơn thanh toán: tự động áp dụng giá phòng, phụ thu (từ khách thứ 3) và hệ số khách quốc tế theo cấu hình hệ thống.
-  - Khóa phân tán (Distributed Lock) giúp ngăn chặn xung đột khi nhiều nhân viên cùng thao tác thanh toán.
+  - Khóa phân tán (Distributed Lock) giúp ngăn chặn xung đột khi nhiều nhân viên cùng thao tác thanh toán / đặt phòng.
   - Báo cáo thống kê doanh thu và mật độ sử dụng phòng.
   - Quản lý các phiên chat hỗ trợ khách hàng (tự động đóng sau 5 phút không phản hồi).
 
@@ -29,9 +30,9 @@ Sau khi khởi động ứng dụng, hệ thống tự động khởi tạo các
 
 | Tài khoản | Mật khẩu | Quyền |
 | :--- | :--- | :--- |
-| `admin` | `admin123` | Quản trị viên hệ thống |
-| `receptionist` | `recep123` | Nhân viên lễ tân |
-| `customer` | `cust123` | Khách hàng |
+| `admin` | `Admin@123` | Quản trị viên hệ thống |
+| `receptionist` | `Receptionist@123` | Nhân viên lễ tân |
+| `customer` | `Customer@123` | Khách hàng |
 
 ## Hướng dẫn cài đặt và chạy local
 
@@ -55,8 +56,8 @@ cd frontend
 npm install
 npm run dev
 ```
-- Giao diện Khách hàng: `http://localhost:3000/`
-- Giao diện Quản trị / Lễ tân: `http://localhost:3000/admin`
+- Giao diện Khách hàng: `http://localhost:5173/`
+- Giao diện Quản trị / Lễ tân: `http://localhost:5173/admin`
 
 ## Hướng dẫn Deploy
 

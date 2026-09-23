@@ -7,8 +7,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 @Component
@@ -26,6 +24,9 @@ public class VNPayConfig {
     @Value("${vnpay.return-url}")
     private String returnUrl;
 
+    @Value("${vnpay.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
+
     public String getTmnCode() {
         return tmnCode;
     }
@@ -42,6 +43,10 @@ public class VNPayConfig {
         return returnUrl;
     }
 
+    public String getFrontendUrl() {
+        return frontendUrl;
+    }
+
     public static String hashAllFields(Map<String, String> fields, String secretKey) {
         List<String> fieldNames = new ArrayList<>(fields.keySet());
         Collections.sort(fieldNames);
@@ -50,7 +55,7 @@ public class VNPayConfig {
         while (itr.hasNext()) {
             String fieldName = itr.next();
             String fieldValue = fields.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
+            if ((fieldValue != null) && (!fieldValue.isEmpty())) {
                 sb.append(fieldName);
                 sb.append("=");
                 sb.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
